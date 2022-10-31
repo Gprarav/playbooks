@@ -1,0 +1,34 @@
+---
+- hosts: localhost
+  vars: 
+   file: /home/user/ansible_task/draft.txt
+   domain1: https://portal.igotkarmayogi.gov.in/api/content/v1/search
+   token: 
+  tasks:
+  - name: Draft Course
+    uri:
+     url: "{{ domain1 }}"
+     method: POST
+     body: "{{ lookup('file','draft.txt' ) }}"
+     body_format: json
+     headers:
+       Content-Type: "application/json"
+    register: data
+  
+  - name: de-bugging
+    debug:
+            msg: "{{ item.identifier }},{{ item.name }},{{ item.organisation }},{{item.status}}"
+    with_items: "{{ data.json.result.content }}"
+
+  - name: ensure file exists
+    copy:
+         content: "Identifier,Course Name,Organisation,status"
+         dest: "draft_course_details.csv"
+         force: no
+
+  - name: Generating final report
+    lineinfile:
+          dest: "draft_course_details.csv"
+          line: "{{ item.identifier }},{{ item.name }},{{ item.organisation[0] }},{{item.status}}"
+          insertafter: EOF
+    with_items: "{{ data.json.result.content }}"
