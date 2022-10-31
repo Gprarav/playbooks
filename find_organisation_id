@@ -1,0 +1,50 @@
+---
+- hosts: localhost
+  vars:
+    domain1: "https://portal.igotkarmayogi.gov.in/auth/realms/sunbird/protocol/openid-connect/token"   
+    domain2: "https://portal.igotkarmayogi.gov.in/api/org/v1/search"
+    token: 
+  tasks:
+  - name: generate authentication token
+    uri:
+     url: "{{ domain1 }}"
+     method: POST
+     body_format: form-urlencoded
+     body:
+       username: 
+       password: 
+       client_id: admin-cli
+       grant_type: password    
+    register:  data
+
+  - name: Storing token in a variable
+    set_fact:
+       authorizes_token: "{{data.json.access_token}}"  
+  - debug:
+      var: authorizes_token
+
+
+  - name: organisation id
+    uri:
+     url: "{{ domain2 }}"
+     method: POST
+     body: "{{ lookup('file','orga_id.txt' ) }}"
+     body_format: json
+     headers:
+       Content-Type: "application/json"
+    register: data
+  
+  - name: store org id's   
+    debug:
+            msg: "{{ item.id }}"
+    with_items: "{{ data.json.result.response.content }}"
+  - name: copy in csv
+    copy:
+      content: "RootOrgID"
+      dest: isRootOrg.csv
+  
+  - name: Generate Report
+    lineinfile:
+          dest: isRootOrg.csv
+          line: "{{ item.id}}"
+    with_items: "{{ data.json.result.response.content }}"
