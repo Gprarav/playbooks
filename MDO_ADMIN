@@ -1,0 +1,56 @@
+---
+- hosts: localhost
+  vars:
+    role_name: MDO_ADMIN
+    mdo_body: "{\"request\":{\"filters\":{\"organisations.roles\":[\"{{ role_name }}\"],\"status\":1},\"fields\":[\"firstName\",\"lastName\",\"profileDetails.personalDetails.primaryEmail\",\"identifier\",\"rootOrgName\",\"roles\"],\"sortBy\":{\"createdDate\":\"Desc\"}}}"
+    
+
+    
+    domain1: "https://portal.igotkarmayogi.gov.in/auth/realms/sunbird/protocol/openid-connect/token"   
+    domain2: "https://portal.igotkarmayogi.gov.in/api/user/v1/search"
+    token: 
+  tasks:
+  - name: generate authentication token
+    uri:
+     url: "{{ domain1 }}"
+     method: POST
+     body_format: form-urlencoded
+     body:
+       username: 
+       password: 
+       client_id: admin-cli
+       grant_type: password    
+    register:  data
+
+  - name: Storing token in a variable
+    set_fact:
+       authorizes_token: "{{data.json.access_token}}"  
+  - debug:
+      var: authorizes_token
+
+  - name: MDO_ADMIN_DETAILS
+    uri:
+     url: "{{ domain2 }}"
+     method: POST
+     headers:
+      content-type: "application/json"
+      authorization: "{{ token }}"
+      x-authenticated-user-token: "{{ authorizes_token }}"
+     body: "{{ mdo_body }}"
+     body_format: json
+    register: mdo
+
+  - debug:
+      msg: "{{ item.identifier }},{{ item.firstName }},{{ item.lastName }},{{ item.profileDetails.personalDetails.primaryEmail }},{{item.rootOrgName }}"
+    with_items: "{{ mdo.json.result.response.content }}"
+
+  - name: copy in csv
+    copy:
+      content: "identifier,firstName,lastName,primaryEmail,OrgName,role_name"
+      dest: MDO_details.csv
+  
+  - name: Generate Report
+    lineinfile:
+          dest: MDO_details.csv
+          line: "{{ item.identifier}},{{ item.firstName }},{{ item.lastName }},{{item.profileDetails.personalDetails.primaryEmail}},{{item.rootOrgName }},{{role_name}}"
+    with_items: "{{ mdo.json.result.response.content}}"
